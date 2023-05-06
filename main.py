@@ -69,22 +69,22 @@ class Blackjack:
         while player_hand_value <= 21:
             state = (player_hand_value, dealer_hand_value, player_has_ace)
             episode_time['state'] = state
-            print(f"Game state {state}.")
+            # print(f"Game state {state}.")
             
             # Get the players next action.
             player_action =  self.policy[state]
             episode_time['action'] = player_action
-            print(f"Agent action {player_action}.")
+            # print(f"Agent action {player_action}.")
 
             episode_time['reward'] = 0
             episode.append(copy.copy(episode_time))
 
             # Resolve the players decision.
             if player_action == self.ACTIONS.HIT:
-                print("\nAgent hits.")
+                # print("\nAgent hits.")
                 # Draw a card.
                 player_card_value = random.randint(2, 11)
-                print(f"Agent draws {player_card_value}.")
+                # print(f"Agent draws {player_card_value}.")
                 # Check whether it can be an ace.
                 if player_card_value == 11 and player_hand_value + player_card_value > 21:
                     player_card_value = 1
@@ -92,17 +92,17 @@ class Blackjack:
                     player_has_ace = 1
 
                 player_hand_value += player_card_value
-                print(f"Agent hand value {player_hand_value}.")
+                # print(f"Agent hand value {player_hand_value}.")
 
                 # Check whether the player busts.
                 if player_hand_value > 21:
-                    print(f"Agent busts.")
+                    # print(f"Agent busts.")
                     break
 
                 # Continue playing until the player decides to stick.
                 continue
             
-            print("\nAgent sticks.")
+            # print("\nAgent sticks.")
             break
 
         # Play the dealers hand.
@@ -110,41 +110,36 @@ class Blackjack:
         while dealer_hand_value < 17 and player_hand_value <= 21:
             # Draw a card.
             dealer_card_value = random.randint(2, 11)
-            print(f"dealer draws {dealer_card_value}.")
+            # print(f"dealer draws {dealer_card_value}.")
             # Check whether it can be an ace.
             if dealer_card_value == 11 and dealer_hand_value + dealer_card_value > 21:
                 dealer_card_value = 1
 
             dealer_hand_value += dealer_card_value
-            print(f"Dealer hand value {dealer_hand_value}.")
+            # print(f"Dealer hand value {dealer_hand_value}.")
 
             # Check whether the dealer busts.
             if dealer_hand_value > 21:
-                print("Dealer busts.")
+                # print("Dealer busts.")
                 break
 
         # Determine the winner of the game.
         # Check if the dealer has won.
         if dealer_hand_value <= 21 and dealer_hand_value > player_hand_value \
             or player_hand_value > 21:
-            print("Dealer wins.")
-            # episode_time['reward'] = -1
+            # print("Dealer wins.")
             episode[-1]['reward'] = -1
-            # episode.append(episode_time)
         # Check if the game is a draw.
         elif dealer_hand_value == player_hand_value:
-            print("Dealer & Agent draw.")
-            # episode_time['reward'] = 0
-            # episode[-1]['reward'] = -1
-            # episode.append(episode_time)
+            # print("Dealer & Agent draw.")
+            pass
         # Else the player wins.
         else:
-            print("Agent wins.")
-            # episode_time['reward'] = 1
+            # print("Agent wins.")
             episode[-1]['reward'] = 1
-            # episode.append(episode_time)
 
-        print(episode)
+        print(f"({player_hand_value}, {dealer_hand_value}, {player_has_ace})")
+        # print(episode)
         return episode
 
     def estimate_value_function(self):
@@ -152,12 +147,23 @@ class Blackjack:
         Monte Carlo Prediction."""
 
         maximum_number_of_episodes = 1
+        gamma = 1
 
         # Loop for every episode.
         for episode_counter in range(maximum_number_of_episodes):
-
+            # episode_list = []
             # Play a hand of Blackjack under the policy.
             episode = self.play_hand()
+            # Reverse the list. I belive this is where the no bootstrapping comes in
+            episode = list(reversed(episode))
+            # episode_list.append(episode)
+            expected_return = 0
+            print(episode)
+            for step in episode:
+                print(step)
+                print(f"next reward {step['reward']}")
+                expected_return = gamma * expected_return + step['reward']
+
 
 
 if __name__ == "__main__":
