@@ -22,10 +22,14 @@ class Blackjack:
         self.ACTIONS = Constants.ACTIONS
 
         # Initialise the state space.
+        self.player_values = range(12, 21 + 1)
+        self.dealer_values = range(1, 10 + 1)
+        self.usable_aces = range(0, 1 + 1)
+        self.plot0 = None
         self.state_space = {}
-        for player_sum in range(12, 21 + 1):
-            for dealer_sum in range(1, 10 + 1):
-                for usable_ace in range(0, 1 + 1):
+        for player_sum in self.player_values:
+            for dealer_sum in self.dealer_values:
+                for usable_ace in self.usable_aces:
                     state = (player_sum, dealer_sum, usable_ace)
 
                     self.state_space[state] = {
@@ -46,6 +50,44 @@ class Blackjack:
                 self.policy[state] = self.ACTIONS.HIT
 
         self.estimate_value_function()
+        self.plot_state_space()
+
+    def plot_state_space(self):
+        """Visualise the value function after Monte Carlo estimation."""
+
+        player_values_list = list(self.player_values)
+        dealer_values_list = list(self.dealer_values)
+        value_function_0 = np.zeros((len(player_values_list), len(dealer_values_list)))
+        value_function_1 = np.zeros((len(player_values_list), len(dealer_values_list)))
+        
+        for i, player_value in enumerate(player_values_list):
+            for j, dealer_value in enumerate(dealer_values_list):
+                state_0 = (player_value, dealer_value, 1)
+                state_1 = (player_value, dealer_value, 1)
+                value_function_0[i, j] = self.plot0[state_0]['state value']
+                value_function_1[i, j] = self.state_space[state_1]['state value']
+
+        X, Y = np.meshgrid(player_values_list, dealer_values_list)
+
+        fig, axes = plt.subplots(1, 2, figsize=(6, 8), subplot_kw={'projection': '3d'})
+        fig.tight_layout()
+        
+        # Plot for usable_ace = 0
+        axes[0].plot_surface(X, Y, value_function_0, cmap='viridis')
+        axes[0].set_xlabel('Dealer Hand Value')
+        axes[0].set_ylabel('Player Hand Value')
+        axes[0].set_zlabel('Value Function')
+        axes[0].set_title('Value Function after 10 episodes')
+
+        # Plot for usable_ace = 1
+        axes[1].plot_surface(X, Y, value_function_1, cmap='viridis')
+        axes[1].set_xlabel('Dealer Hand Value')
+        axes[1].set_ylabel('Player Hand Value')
+        axes[1].set_zlabel('Value Function')
+        axes[1].set_title('Value Function after 1 000 000 episodes')
+
+        plt.show()
+
 
     def play_hand(self) -> list:
         """Generate an episode under the policy."""
@@ -146,7 +188,7 @@ class Blackjack:
         """Estimate the value function under the policy with First-visit
         Monte Carlo Prediction."""
 
-        maximum_number_of_episodes = 10000
+        maximum_number_of_episodes = 1000000
         gamma = 1
 
         # Loop for every episode.
@@ -179,16 +221,10 @@ class Blackjack:
                     self.state_space[step['state']]['state value'] = sum(self.state_space[step['state']]['state returns'])
                     # print(f"State value: {self.state_space[step['state']]['state value']}.")
 
-        # print(f"State space after {maximum_number_of_episodes} episodes:\n{self.state_space}")
-        highest_state_value = 0
-        for state in self.state_space:
-            print(f"{state}:\n{self.state_space[state]}")
-            if self.state_space[state]['state value'] > highest_state_value:
-                highest_state_value = self.state_space[state]['state value']
-
-        print(highest_state_value)
-
-
+            if episode_counter == 10:
+                self.plot0 = copy.deepcopy(self.state_space)
+            print(f"\rCompleted {episode_counter/maximum_number_of_episodes}", end = "")
+        print("")
 
 if __name__ == "__main__":
     beat_the_dealer = Blackjack()
