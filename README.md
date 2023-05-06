@@ -11,6 +11,7 @@ Monte Carlo Value prediction for a simple deterministic policy.
 
 ## Introduction
 This is a simple implementation of Monte Carlo prediction for the value function of a deterministic policy in Blackjack. The policy is to stick if the player's hand value is 20 or 21, and to hit otherwise. The player is dealt cards from an infinite deck (i.e. cards are replaced after being drawn). The player plays against a fixed dealer policy: stick if hand value is 17 or more, and hit otherwise. The player receives a reward of +1 if they win, 0 if they draw, and -1 if they lose.
+This is being used as a frist step into Monte Carlo prediction methods.
 
 ## Installation
 This project was written in Python 3.11.3. To install, clone the repository and install the requirements:
