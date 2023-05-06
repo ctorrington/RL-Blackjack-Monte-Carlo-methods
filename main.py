@@ -26,10 +26,19 @@ class Blackjack:
                     key = (player_sum, dealer_sum, usable_ace)
 
                     self.state_space[key] = {
-                        'actions': [ACTIONS.HIT, ACTIONS.STICK],
-                        'reward': 0,
-                        'value': 0,
+                        'state actions': [ACTIONS.HIT, ACTIONS.STICK],
+                        'state reward': 0,
+                        'state value': 0,
                     }
+
+        # Deterministic policy. The player will hit on anything less than 20.
+        self.policy = {}
+        for state in self.state_space:
+            player_sum, _, _ = state
+            if player_sum >= 20:
+                self.policy[state] = ACTIONS.STICK
+            else:
+                self.policy[state] = ACTIONS.HIT
 
         for state in self.state_space:
             print(f"state {state}\n{self.state_space[state]}")
