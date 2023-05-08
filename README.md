@@ -30,6 +30,8 @@ Below is an example of the output of the program:
 
 ![Gif of the value function updating in a 3D space](https://github.com/ctorrington/RL-Blackjack-MC-Prediction/blob/main/images/blackjack_value_function.gif?raw=true)
 
+The gif is of of the value function updating. The gif only shows the first 100 episodes, but the image below shows the converged value function after 1 000 000 episodes. The value function is estimated using First-Vist Monte Carlo prediction.
+
 ![Example output](https://github.com/ctorrington/RL-Blackjack-MC-Prediction/blob/main/images/mesh%20plot%20for%20value%20function.png?raw=true)
 
 The image on the left shows the value function for the policy after 10 games have been simulated.
