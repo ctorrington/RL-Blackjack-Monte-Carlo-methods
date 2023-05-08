@@ -4,6 +4,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from matplotlib.animation import FuncAnimation
+
 # Libraries.
 import random
 import copy
@@ -25,19 +27,16 @@ class Blackjack:
         self.player_values = range(12, 21 + 1)
         self.dealer_values = range(1, 10 + 1)
         self.usable_aces = range(0, 1 + 1)
-        self.plot0 = None
         self.state_space = {}
         for player_sum in self.player_values:
             for dealer_sum in self.dealer_values:
                 for usable_ace in self.usable_aces:
                     state = (player_sum, dealer_sum, usable_ace)
-
                     self.state_space[state] = {
                         'state actions': [self.ACTIONS.HIT, self.ACTIONS.STICK],
                         'state reward': 0,
                         'state value': 0,
                         'state returns': {
-                            'average': 0,
                             'entries': 0,
                         },
                     }
@@ -53,44 +52,33 @@ class Blackjack:
                 self.policy[state] = self.ACTIONS.HIT
 
         self.estimate_value_function()
-        self.plot_state_space()
+        self.plot_state_space(1)
 
-    def plot_state_space(self):
+    def plot_state_space(self, episodes: int):
         """Visualise the value function after Monte Carlo estimation."""
 
         player_values_list = list(self.player_values)
         dealer_values_list = list(self.dealer_values)
-        value_function_0 = np.zeros((len(player_values_list), len(dealer_values_list)))
-        value_function_1 = np.zeros((len(player_values_list), len(dealer_values_list)))
-        
+        state_value_function = np.zeros((len(player_values_list),
+                                         len(dealer_values_list)))
+
         for i, player_value in enumerate(player_values_list):
             for j, dealer_value in enumerate(dealer_values_list):
-                state_0 = (player_value, dealer_value, 1)
-                state_1 = (player_value, dealer_value, 1)
-                value_function_0[i, j] = self.plot0[state_0]['state value']
-                value_function_1[i, j] = self.state_space[state_1]['state value']
+                axis = (player_value, dealer_value, 1)
+                state_value_function[i, j] = self.state_space[axis]['state value']
 
         X, Y = np.meshgrid(player_values_list, dealer_values_list)
 
-        fig, axes = plt.subplots(1, 2, figsize=(6, 8), subplot_kw={'projection': '3d'})
-        fig.tight_layout()
-        
-        # Plot for usable_ace = 0
-        axes[0].plot_surface(X, Y, value_function_0, cmap='viridis')
-        axes[0].set_xlabel('Dealer Hand Value')
-        axes[0].set_ylabel('Player Hand Value')
-        axes[0].set_zlabel('Value Function')
-        axes[0].set_title('Value Function after 10 episodes')
+        fig, axes = plt.subplots(1, 2, figsize=(6, 8),
+                                 subplot_kw={'projection': '3d'})
 
-        # Plot for usable_ace = 1
-        axes[1].plot_surface(X, Y, value_function_1, cmap='viridis')
-        axes[1].set_xlabel('Dealer Hand Value')
-        axes[1].set_ylabel('Player Hand Value')
+        axes[1].plot_surface(X, Y, state_value_function, cmap='viridis')
+        axes[1].set_xlabel('Player Hand Value')
+        axes[1].set_ylabel('Dealer hand Value')
         axes[1].set_zlabel('Value Function')
-        axes[1].set_title('Value Function after 1 000 000 episodes')
+        axes[1].set_title(f'Value Function after {episodes} episodes')
 
         plt.show()
-
 
     def play_hand(self) -> list:
         """Generate an episode under the policy."""
@@ -115,7 +103,7 @@ class Blackjack:
             state = (player_hand_value, dealer_hand_value, player_has_ace)
             episode_time['state'] = state
             # print(f"Game state {state}.")
-            
+
             # Get the players next action.
             player_action =  self.policy[state]
             episode_time['action'] = player_action
@@ -131,9 +119,11 @@ class Blackjack:
                 player_card_value = random.randint(2, 11)
                 # print(f"Agent draws {player_card_value}.")
                 # Check whether it can be an ace.
-                if player_card_value == 11 and player_hand_value + player_card_value > 21:
+                if player_card_value == 11 and player_hand_value \
+                                                + player_card_value > 21:
                     player_card_value = 1
-                elif player_card_value == 11 and player_hand_value + player_card_value <= 21:
+                elif player_card_value == 11 and player_hand_value \
+                                                + player_card_value <= 21:
                     player_has_ace = 1
 
                 player_hand_value += player_card_value
@@ -157,7 +147,8 @@ class Blackjack:
             dealer_card_value = random.randint(2, 11)
             # print(f"dealer draws {dealer_card_value}.")
             # Check whether it can be an ace.
-            if dealer_card_value == 11 and dealer_hand_value + dealer_card_value > 21:
+            if dealer_card_value == 11 and dealer_hand_value \
+                                            + dealer_card_value > 21:
                 dealer_card_value = 1
 
             dealer_hand_value += dealer_card_value
@@ -186,6 +177,52 @@ class Blackjack:
         # print(f"({player_hand_value}, {dealer_hand_value}, {player_has_ace})")
         # print(episode)
         return episode
+    
+    def check_state_visited_earlier(self, episode: list, index: int) -> bool:
+        """Check if the state is visted earlier in the episode."""
+
+        state_visited_earlier = False
+        # Loop through the earlier states.
+        for i in range(index):
+            # Check if the state is visited earlier.
+            if episode[i]['state'] == episode[index]['state']:
+                state_visited_earlier = True
+                break
+
+        return state_visited_earlier
+    
+    def update_state_value(self, state: tuple[int, int, int],
+                           expected_return: float) -> None:
+        """Update the state value estimation."""
+
+        # Update the state value estimation.
+        self.state_space[state]['state returns']['entries'] += 1
+        state_average_value = self.state_space[state]['state value']
+        entries = self.state_space[state]['state returns']['entries']
+        self.state_space[state]['state value'] += (expected_return \
+                                                    - state_average_value) \
+                                                    / entries
+    
+    def process_episode(self, episode: list,
+                        gamma: float,
+                        expected_return: float) -> None:
+        """Process an episode to estimate the value function under the policy.
+        This is done using first-visit Monte Carlo prediction."""
+
+        for index, step in enumerate(episode):
+            # Calculate the expected return.
+            expected_return = gamma * expected_return + step['reward']
+
+            # Check if the state is visited earlier in the episode.
+            state_visited_earlier = self.check_state_visited_earlier(episode,
+                                                                     index)
+
+            # Only change the expected return for the state if it is not 
+            # visited earlier in the episode. This is a first-visit MC Method.
+            if not state_visited_earlier:
+                # Update the average for the state value estimation.
+                self.update_state_value(step['state'], expected_return)
+                
 
     def estimate_value_function(self):
         """Estimate the value function under the policy with First-visit
@@ -196,38 +233,19 @@ class Blackjack:
 
         # Loop for every episode.
         for episode_counter in range(maximum_number_of_episodes):
-            # episode_list = []
             # Play a hand of Blackjack under the policy.
             episode = self.play_hand()
-            # Reverse the list. I belive this is where the no bootstrapping comes in
+
+            # Reverse the list.
+            # I belive this is where the no bootstrapping thing comes in.
             episode = list(reversed(episode))
-            # episode_list.append(episode)
             expected_return = 0
-            # print(episode)
-            for index, step in enumerate(episode):
-                # print(step)
-                # print(f"next reward {step['reward']}")
-                expected_return = gamma * expected_return + step['reward']
-                # Check if the current state appears in the upcoming states 
-                # (the beginning states), this list is reversed.
-                state_upcoming = False
-                # print("upcoming states:")
-                for upcoming_state in range(index + 1, len(episode)):
-                    # print(f"STAAATE: {episode[upcoming_state]}")
-                    if step['state'] == episode[upcoming_state]['state']:
-                        state_upcoming = True
-                        break
-                if not state_upcoming:
 
-                    # Update the average for the state value estimation.
-                    self.state_space[step['state']]['state returns']['entries'] += 1
-                    state_average_value = self.state_space[step['state']]['state value']
-                    entries = self.state_space[step['state']]['state returns']['entries']
-                    self.state_space[step['state']]['state value'] += (expected_return - state_average_value) / entries
-
-            if episode_counter == 10:
-                self.plot0 = copy.deepcopy(self.state_space)
-            print(f"\rCompleted {episode_counter/maximum_number_of_episodes}", end = "")
+            # Process the episode.
+            self.process_episode(episode, gamma, expected_return)
+            print(f"\rCompleted {episode_counter/maximum_number_of_episodes}",
+                  end = "")
+        # This is here for errors. It was hard to read them without a new line.
         print("")
 
 if __name__ == "__main__":
