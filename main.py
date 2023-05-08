@@ -36,7 +36,10 @@ class Blackjack:
                         'state actions': [self.ACTIONS.HIT, self.ACTIONS.STICK],
                         'state reward': 0,
                         'state value': 0,
-                        'state returns': [],
+                        'state returns': {
+                            'average': 0,
+                            'entries': 0,
+                        },
                     }
 
         # Deterministic policy.
@@ -215,11 +218,12 @@ class Blackjack:
                         state_upcoming = True
                         break
                 if not state_upcoming:
-                    # print(f"Expected return G: {expected_return}.")
-                    self.state_space[step['state']]['state returns'].append(expected_return)
-                    # print(f"State returns: {self.state_space[step['state']]['state returns']}.")
-                    self.state_space[step['state']]['state value'] = sum(self.state_space[step['state']]['state returns'])
-                    # print(f"State value: {self.state_space[step['state']]['state value']}.")
+
+                    # Update the average for the state value estimation.
+                    self.state_space[step['state']]['state returns']['entries'] += 1
+                    state_average_value = self.state_space[step['state']]['state value']
+                    entries = self.state_space[step['state']]['state returns']['entries']
+                    self.state_space[step['state']]['state value'] += (expected_return - state_average_value) / entries
 
             if episode_counter == 10:
                 self.plot0 = copy.deepcopy(self.state_space)
