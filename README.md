@@ -28,6 +28,8 @@ python main.py
 ## Examples
 Below is an example of the output of the program:
 
+![Gif of the value function updating in a 3D space](https://github.com/ctorrington/RL-Blackjack-MC-Prediction/blob/main/images/blackjack_value_function.gif?raw=true)
+
 ![Example output](https://github.com/ctorrington/RL-Blackjack-MC-Prediction/blob/main/images/mesh%20plot%20for%20value%20function.png?raw=true)
 
 The image on the left shows the value function for the policy after 10 games have been simulated.
