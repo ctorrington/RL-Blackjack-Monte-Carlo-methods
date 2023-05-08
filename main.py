@@ -9,6 +9,7 @@ from matplotlib.animation import FuncAnimation
 # Libraries.
 import random
 import copy
+import time
 
 from constants import Constants
 
@@ -51,34 +52,89 @@ class Blackjack:
             else:
                 self.policy[state] = self.ACTIONS.HIT
 
-        self.estimate_value_function()
-        self.plot_state_space(1)
+        self.data = []
 
-    def plot_state_space(self, episodes: int):
+        self.estimate_value_function()
+        self.plot_state_space()
+
+    def exponential_frame_sequence(self, number_of_frames,
+                                   number_of_values):
+        """Create a sequence of frames for the animation."""
+
+        frame_indices = np.linspace(0, number_of_frames - 1, num=number_of_frames) ** 5
+        frame_indices = frame_indices.astype(int)
+        frame_indices = np.clip(frame_indices, 0, number_of_values - 1)
+        return frame_indices
+
+    def plot_state_space(self):
         """Visualise the value function after Monte Carlo estimation."""
 
+        # Plot the value function.
+
+        # Initialise the plot.
         player_values_list = list(self.player_values)
         dealer_values_list = list(self.dealer_values)
         state_value_function = np.zeros((len(player_values_list),
                                          len(dealer_values_list)))
-
-        for i, player_value in enumerate(player_values_list):
-            for j, dealer_value in enumerate(dealer_values_list):
-                axis = (player_value, dealer_value, 1)
-                state_value_function[i, j] = self.state_space[axis]['state value']
-
         X, Y = np.meshgrid(player_values_list, dealer_values_list)
+        z_data = np.zeros((len(player_values_list),
+                           len(dealer_values_list)))
 
-        fig, axes = plt.subplots(1, 2, figsize=(6, 8),
-                                 subplot_kw={'projection': '3d'})
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        surface = ax.plot_surface(X, Y, state_value_function, cmap='viridis')
 
-        axes[1].plot_surface(X, Y, state_value_function, cmap='viridis')
-        axes[1].set_xlabel('Player Hand Value')
-        axes[1].set_ylabel('Dealer hand Value')
-        axes[1].set_zlabel('Value Function')
-        axes[1].set_title(f'Value Function after {episodes} episodes')
+        ax.set_xlabel('Player Hand Value')
+        ax.set_ylabel('Dealer hand Value')
+        ax.set_zlabel('Value Function')
+        print("Animating...")
 
+        def update_plot(frame):
+            """Update the plot."""
+
+            print(frame)
+            for i, player_value in enumerate(self.player_values):
+                for j, dealer_value in enumerate(self.dealer_values):
+                    # Usable ace.
+                    state = (player_value, dealer_value, 1)
+                    z_data[i, j] = self.data[frame][state]['state value']
+                    ax.set_title(f'Value Function after {frame} episodes')
+
+            if frame == len(self.data) - 1:
+                for i, player_value in enumerate(self.player_values):
+                    for j, dealer_value in enumerate(self.dealer_values):
+                        # Usable ace.
+                        state = (player_value, dealer_value, 1)
+                        z_data[i, j] = self.data[-1][state]['state value']
+                surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
+            else:
+                surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
+                
+    
+        frames = self.exponential_frame_sequence(100, len(self.data))
+        animation = FuncAnimation(fig, update_plot,
+                                  frames=100,
+                                  interval=1000,
+                                  repeat=False)
+        
+        for i, player_value in enumerate(self.player_values):
+                for j, dealer_value in enumerate(self.dealer_values):
+                    # Usable ace.
+                    state = (player_value, dealer_value, 1)
+                    z_data[i, j] = self.data[-1][state]['state value']
+                    ax.set_title(f'Value Function after 1 000 000 episodes')
+        surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
+        print("Completed animation.")
         plt.show()
+
+        # Save the animation.
+        print("Saving animation...")
+        animation.save('blackjack_value_function.gif',
+                       writer='pillow',
+                       fps=5)
+        print("Animation saved.")
+
+        
 
     def play_hand(self) -> list:
         """Generate an episode under the policy."""
@@ -222,13 +278,21 @@ class Blackjack:
             if not state_visited_earlier:
                 # Update the average for the state value estimation.
                 self.update_state_value(step['state'], expected_return)
-                
+
+    def track_data(self, episode_index: int,
+                   start_time: float) -> None:
+        """Track the data for the state value estimation."""
+
+        track_data = copy.deepcopy(self.state_space)
+        track_data['episode'] = episode_index
+        track_data['computation duration'] = time.time() - start_time
+        self.data.append(track_data)
 
     def estimate_value_function(self):
         """Estimate the value function under the policy with First-visit
         Monte Carlo Prediction."""
 
-        maximum_number_of_episodes = 1000000
+        maximum_number_of_episodes = 10000
         gamma = 1
 
         # Loop for every episode.
@@ -242,9 +306,17 @@ class Blackjack:
             expected_return = 0
 
             # Process the episode.
+            start_time = time.time()
             self.process_episode(episode, gamma, expected_return)
+
+            # Add the episode to the list of tracked episodes.
+            # if episode_counter % 2 == 0:
+            self.track_data(episode_counter, start_time)
+
+            # Print the progress.
             print(f"\rCompleted {episode_counter/maximum_number_of_episodes}",
                   end = "")
+
         # This is here for errors. It was hard to read them without a new line.
         print("")
 
