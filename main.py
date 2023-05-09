@@ -55,7 +55,7 @@ class Blackjack:
         self.data = []
 
         self.estimate_value_function()
-        self.plot_state_space()
+        # self.animate_state_space()
 
     def exponential_frame_sequence(self, number_of_frames,
                                    number_of_values):
@@ -66,7 +66,7 @@ class Blackjack:
         frame_indices = np.clip(frame_indices, 0, number_of_values - 1)
         return frame_indices
 
-    def plot_state_space(self):
+    def animate_state_space(self):
         """Visualise the value function after Monte Carlo estimation."""
 
         # Plot the value function.
@@ -134,10 +134,10 @@ class Blackjack:
                        fps=5)
         print("Animation saved.")
 
-        
-
     def play_hand(self) -> list:
-        """Generate an episode under the policy."""
+        """Generate an episode under the policy.
+        
+        I don't think its possible to refactor this anymore. I am sorry."""
 
         # Using a dictionary for tracking states, actions & rewards in an episode.
         # The dictionaries will be indexable within the list for the time stamps.
@@ -292,8 +292,15 @@ class Blackjack:
         """Estimate the value function under the policy with First-visit
         Monte Carlo Prediction."""
 
-        maximum_number_of_episodes = 10000
+        print("Estimating the value function under the policy with First-visit"
+              " Monte Carlo Prediction.")
+              
+        maximum_number_of_episodes = 100000
         gamma = 1
+        track_data = False
+
+        print(f"Computing {maximum_number_of_episodes} episodes "
+              f"with gamma {gamma}.")
 
         # Loop for every episode.
         for episode_counter in range(maximum_number_of_episodes):
@@ -310,15 +317,22 @@ class Blackjack:
             self.process_episode(episode, gamma, expected_return)
 
             # Add the episode to the list of tracked episodes.
-            # if episode_counter % 2 == 0:
-            self.track_data(episode_counter, start_time)
+            if track_data:
+                self.track_data(episode_counter, start_time)
 
             # Print the progress.
             print(f"\rCompleted {episode_counter/maximum_number_of_episodes}",
                   end = "")
 
         # This is here for errors. It was hard to read them without a new line.
-        print("")
+        print("\rCompleted 1.0           \n")
+
+
+    def off_policy_prediction_via_importance_sampling(self,
+                                                      state: tuple[int, int, int]):
+        """Estimate the value of a single state with off-policy data"""
+
+
 
 if __name__ == "__main__":
     beat_the_dealer = Blackjack()
