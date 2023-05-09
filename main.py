@@ -13,6 +13,7 @@ import time
 
 from constants import Constants
 from generate_blackjack_episode import generate_blackjack_episode
+from off_policy_control import off_policy_control
 
 class Blackjack:
     """Blackjack environment."""
@@ -27,6 +28,7 @@ class Blackjack:
 
         # Initialise the state space.
         self.player_values = range(12, 21 + 1)
+        # TODO the dealer cant draw aces. idk why
         self.dealer_values = range(1, 10 + 1)
         self.usable_aces = range(0, 1 + 1)
         self.state_space = {}
@@ -66,6 +68,7 @@ class Blackjack:
                     }
         self.data = []
 
+        off_policy_control(self.state_space, self.data)
         self.estimate_value_function()
         self.animate_state_space()
 
@@ -86,8 +89,6 @@ class Blackjack:
         # Initialise the plot.
         player_values_list = list(self.player_values)
         dealer_values_list = list(self.dealer_values)
-        state_value_function = np.zeros((len(player_values_list),
-                                         len(dealer_values_list)))
         X, Y = np.meshgrid(player_values_list, dealer_values_list)
         z_data = np.zeros((len(player_values_list),
                            len(dealer_values_list)))
@@ -117,9 +118,9 @@ class Blackjack:
                         # Usable ace.
                         state = (player_value, dealer_value, 1)
                         z_data[i, j] = self.data[-1][state]['estimated return']
-                surface = ax.plot_surface(Y, X, z_data, cmap='viridis')
+                surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
             else:
-                surface = ax.plot_surface(Y, X, z_data, cmap='viridis')
+                surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
                 
     
         frames = self.exponential_frame_sequence(100, len(self.data))
@@ -198,7 +199,7 @@ class Blackjack:
         print("Estimating the value function under the policy with First-visit"
               " Monte Carlo Prediction.")
               
-        maximum_number_of_episodes = 1000000
+        maximum_number_of_episodes = 100000
         gamma = 1
         track_data = True
 
@@ -208,7 +209,7 @@ class Blackjack:
         # Loop for every episode.
         for episode_counter in range(maximum_number_of_episodes):
             # Play a hand of Blackjack under the policy.
-            episode = generate_blackjack_episode(self.state_space)
+            episode = generate_blackjack_episode(self.state_space, 'behaviour')
 
             # Reverse the list.
             # I belive this is where the no bootstrapping thing comes in.
@@ -229,13 +230,6 @@ class Blackjack:
 
         # This is here for errors. It was hard to read them without a new line.
         print("\rCompleted 1.0           \n")
-
-
-    def off_policy_prediction_via_importance_sampling(self,
-                                                      state: tuple[int, int, int]):
-        """Estimate the value of a single state with off-policy data"""
-
-
 
 if __name__ == "__main__":
     beat_the_dealer = Blackjack()

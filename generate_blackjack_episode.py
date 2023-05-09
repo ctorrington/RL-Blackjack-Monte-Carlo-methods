@@ -43,7 +43,8 @@ def process_player_action(game_state):
     return (hand_value, _, has_ace)
 
 def simulate_player_turn(state,
-                         state_space):
+                         state_space,
+                         policy):
     """Simulate the players turn."""
 
     player_hand_value, dealer_hand_value, player_has_ace = state
@@ -67,7 +68,7 @@ def simulate_player_turn(state,
         timestep['state'] = state
 
         # Get the players action for the current state.
-        action = state_space[state]['policies']['target']
+        action = state_space[state]['policies'][policy]
         # print(f"chosen action {action} in state {state}.")
         # Record the action in the timestep.
         timestep['action'] = action
@@ -116,7 +117,7 @@ def simulate_dealers_turn(dealer_hand_value) -> int:
 
     return dealer_hand_value
 
-def simulate_hand(state_space):
+def simulate_hand(state_space, policy):
     """Simulate a single hand of Blackjack."""
 
     # Simulate the player & dealer drawing cards.
@@ -138,7 +139,7 @@ def simulate_hand(state_space):
 
     # Simulate the players turn.
     episode, player_hand_value, player_has_ace = simulate_player_turn(state,
-                                   state_space)
+                                   state_space, policy)
     
     # Check if the player has not bust:
     if player_hand_value <= 21:
@@ -165,9 +166,9 @@ def simulate_hand(state_space):
     return episode
       
 
-def generate_blackjack_episode(state_space) -> list:
+def generate_blackjack_episode(state_space, policy) -> list:
     """Generate an episode of Blackjack."""
 
     state_space = state_space
 
-    return simulate_hand(state_space)
+    return simulate_hand(state_space, policy)
