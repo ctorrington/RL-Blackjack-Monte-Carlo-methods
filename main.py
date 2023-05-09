@@ -33,8 +33,11 @@ class Blackjack:
             for dealer_sum in self.dealer_values:
                 for usable_ace in self.usable_aces:
                     state = (player_sum, dealer_sum, usable_ace)
+
+                    # State values.
                     self.state_space[state] = {
-                        'state actions': [self.ACTIONS.HIT, self.ACTIONS.STICK],
+                        'state actions': {},
+                        'policies': {},
                         'state reward': 0,
                         'state value': 0,
                         'state returns': {
@@ -42,20 +45,31 @@ class Blackjack:
                         },
                     }
 
-        # Deterministic policy.
-        # The player will hit on anything less than 20.
-        self.policy = {}
-        for state in self.state_space:
-            player_sum, _, _ = state
-            if player_sum >= 20:
-                self.policy[state] = self.ACTIONS.STICK
-            else:
-                self.policy[state] = self.ACTIONS.HIT
+                    # State actions.
+                    for action in self.ACTIONS.as_tuple():
+                        self.state_space[state]['state actions'][action] = {
+                            # Add the action value and the cumulative weight
+                            # for the action in the state.
+                            'action value': 0, # Abitrary value.
+                            'cumulative weights': 0, # Initialised as 0.
+                        }
 
+                    # State policy.
+                    # Set the deterministic policy. Hit below 20.
+                    player_sum, _, _ = state
+                    if player_sum >= 20:
+                        deterministic_action = self.ACTIONS.STICK
+                    else:
+                        deterministic_action = self.ACTIONS.HIT
+                    # Set the behaviour policy.
+                    self.state_space[state]['policies'] = {
+                        'target': deterministic_action,
+                        'behaviour': random.choice(self.ACTIONS.as_tuple()),
+                    }
         self.data = []
 
         self.estimate_value_function()
-        # self.animate_state_space()
+        self.animate_state_space()
 
     def exponential_frame_sequence(self, number_of_frames,
                                    number_of_values):
@@ -82,7 +96,6 @@ class Blackjack:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        surface = ax.plot_surface(X, Y, state_value_function, cmap='viridis')
 
         ax.set_xlabel('Player Hand Value')
         ax.set_ylabel('Dealer hand Value')
@@ -113,26 +126,18 @@ class Blackjack:
     
         frames = self.exponential_frame_sequence(100, len(self.data))
         animation = FuncAnimation(fig, update_plot,
-                                  frames=100,
+                                  frames=len(self.data),
                                   interval=1000,
                                   repeat=False)
-        
-        for i, player_value in enumerate(self.player_values):
-                for j, dealer_value in enumerate(self.dealer_values):
-                    # Usable ace.
-                    state = (player_value, dealer_value, 1)
-                    z_data[i, j] = self.data[-1][state]['state value']
-                    ax.set_title(f'Value Function after 1 000 000 episodes')
-        surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
         print("Completed animation.")
         plt.show()
 
         # Save the animation.
-        print("Saving animation...")
-        animation.save('blackjack_value_function.gif',
-                       writer='pillow',
-                       fps=5)
-        print("Animation saved.")
+        # print("Saving animation...")
+        # animation.save('blackjack_value_function.gif',
+        #                writer='pillow',
+        #                fps=5)
+        # print("Animation saved.")
 
     def play_hand(self) -> list:
         """Generate an episode under the policy.
@@ -161,7 +166,8 @@ class Blackjack:
             # print(f"Game state {state}.")
 
             # Get the players next action.
-            player_action =  self.policy[state]
+            # player_action =  self.policy[state]
+            player_action = self.state_space[state]['policies']['target']
             episode_time['action'] = player_action
             # print(f"Agent action {player_action}.")
 
@@ -297,7 +303,7 @@ class Blackjack:
               
         maximum_number_of_episodes = 100000
         gamma = 1
-        track_data = False
+        track_data = True
 
         print(f"Computing {maximum_number_of_episodes} episodes "
               f"with gamma {gamma}.")
@@ -317,7 +323,7 @@ class Blackjack:
             self.process_episode(episode, gamma, expected_return)
 
             # Add the episode to the list of tracked episodes.
-            if track_data:
+            if track_data and episode_counter >= maximum_number_of_episodes - 1:
                 self.track_data(episode_counter, start_time)
 
             # Print the progress.

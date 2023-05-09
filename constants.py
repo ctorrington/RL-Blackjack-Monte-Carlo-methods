@@ -1,5 +1,9 @@
 class Constants:
 
     class ACTIONS:
-        HIT = 0
-        STICK = 1
+        HIT = "HIT"
+        STICK = "STICK"
+
+        @staticmethod
+        def as_tuple():
+            return Constants.ACTIONS.HIT, Constants.ACTIONS.STICK
