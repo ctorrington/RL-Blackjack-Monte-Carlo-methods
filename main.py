@@ -12,6 +12,8 @@ import copy
 import time
 
 from constants import Constants
+from blackjack import generate_blackjack_episode
+from off_policy_control import estimate_optimal_policy
 
 class Blackjack:
     """Blackjack environment."""
@@ -26,6 +28,7 @@ class Blackjack:
 
         # Initialise the state space.
         self.player_values = range(12, 21 + 1)
+        # TODO the dealer cant draw aces. idk why
         self.dealer_values = range(1, 10 + 1)
         self.usable_aces = range(0, 1 + 1)
         self.state_space = {}
@@ -33,29 +36,41 @@ class Blackjack:
             for dealer_sum in self.dealer_values:
                 for usable_ace in self.usable_aces:
                     state = (player_sum, dealer_sum, usable_ace)
+
+                    # State values.
                     self.state_space[state] = {
-                        'state actions': [self.ACTIONS.HIT, self.ACTIONS.STICK],
-                        'state reward': 0,
-                        'state value': 0,
-                        'state returns': {
-                            'entries': 0,
-                        },
+                        'state actions': {}, # State actions.
+                        'policies': {}, # State policies.
+                        'estimated return': 0, # Expected return for a state.
+                        'state entries': 0, # Number of times a state is encountered.
                     }
 
-        # Deterministic policy.
-        # The player will hit on anything less than 20.
-        self.policy = {}
-        for state in self.state_space:
-            player_sum, _, _ = state
-            if player_sum >= 20:
-                self.policy[state] = self.ACTIONS.STICK
-            else:
-                self.policy[state] = self.ACTIONS.HIT
+                    # State actions.
+                    for action in self.ACTIONS.as_tuple():
+                        self.state_space[state]['state actions'][action] = {
+                            # Add the action value and the cumulative weight
+                            # for the action in the state.
+                            'action value': 0, # Abitrary value.
+                            'cumulative weights': 0, # Initialised as 0.
+                        }
 
+                    # State policy.
+                    # Set the deterministic policy. Hit below 20.
+                    player_sum, _, _ = state
+                    if player_sum >= 20:
+                        deterministic_action = self.ACTIONS.STICK
+                    else:
+                        deterministic_action = self.ACTIONS.HIT
+                    # Set the behaviour policy.
+                    self.state_space[state]['policies'] = {
+                        'target': deterministic_action,
+                        'behaviour': random.choice(self.ACTIONS.as_tuple()),
+                    }
         self.data = []
 
+        estimate_optimal_policy(self.state_space)
         self.estimate_value_function()
-        # self.animate_state_space()
+        self.animate_state_space()
 
     def exponential_frame_sequence(self, number_of_frames,
                                    number_of_values):
@@ -74,15 +89,12 @@ class Blackjack:
         # Initialise the plot.
         player_values_list = list(self.player_values)
         dealer_values_list = list(self.dealer_values)
-        state_value_function = np.zeros((len(player_values_list),
-                                         len(dealer_values_list)))
         X, Y = np.meshgrid(player_values_list, dealer_values_list)
         z_data = np.zeros((len(player_values_list),
                            len(dealer_values_list)))
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        surface = ax.plot_surface(X, Y, state_value_function, cmap='viridis')
 
         ax.set_xlabel('Player Hand Value')
         ax.set_ylabel('Dealer hand Value')
@@ -97,7 +109,7 @@ class Blackjack:
                 for j, dealer_value in enumerate(self.dealer_values):
                     # Usable ace.
                     state = (player_value, dealer_value, 1)
-                    z_data[i, j] = self.data[frame][state]['state value']
+                    z_data[i, j] = self.data[frame][state]['estimated return']
                     ax.set_title(f'Value Function after {frame} episodes')
 
             if frame == len(self.data) - 1:
@@ -105,7 +117,7 @@ class Blackjack:
                     for j, dealer_value in enumerate(self.dealer_values):
                         # Usable ace.
                         state = (player_value, dealer_value, 1)
-                        z_data[i, j] = self.data[-1][state]['state value']
+                        z_data[i, j] = self.data[-1][state]['estimated return']
                 surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
             else:
                 surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
@@ -113,126 +125,18 @@ class Blackjack:
     
         frames = self.exponential_frame_sequence(100, len(self.data))
         animation = FuncAnimation(fig, update_plot,
-                                  frames=100,
+                                  frames=len(self.data),
                                   interval=1000,
                                   repeat=False)
-        
-        for i, player_value in enumerate(self.player_values):
-                for j, dealer_value in enumerate(self.dealer_values):
-                    # Usable ace.
-                    state = (player_value, dealer_value, 1)
-                    z_data[i, j] = self.data[-1][state]['state value']
-                    ax.set_title(f'Value Function after 1 000 000 episodes')
-        surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
         print("Completed animation.")
         plt.show()
 
         # Save the animation.
-        print("Saving animation...")
-        animation.save('blackjack_value_function.gif',
-                       writer='pillow',
-                       fps=5)
-        print("Animation saved.")
-
-    def play_hand(self) -> list:
-        """Generate an episode under the policy.
-        
-        I don't think its possible to refactor this anymore. I am sorry."""
-
-        # Using a dictionary for tracking states, actions & rewards in an episode.
-        # The dictionaries will be indexable within the list for the time stamps.
-        episode = []
-        episode_time = {'state': tuple[int, int, int],
-                        'action': int,
-                        'reward': int}
-
-        player_hand_value = random.randint(12, 21)
-        dealer_hand_value = random.randint(1, 10)
-        if player_hand_value > 11:
-            player_has_ace = 1
-        else:
-            player_has_ace = random.randint(0, 1)
-
-        # Game loop.
-        # Whle the player is not bust.
-        while player_hand_value <= 21:
-            state = (player_hand_value, dealer_hand_value, player_has_ace)
-            episode_time['state'] = state
-            # print(f"Game state {state}.")
-
-            # Get the players next action.
-            player_action =  self.policy[state]
-            episode_time['action'] = player_action
-            # print(f"Agent action {player_action}.")
-
-            episode_time['reward'] = 0
-            episode.append(copy.copy(episode_time))
-
-            # Resolve the players decision.
-            if player_action == self.ACTIONS.HIT:
-                # print("\nAgent hits.")
-                # Draw a card.
-                player_card_value = random.randint(2, 11)
-                # print(f"Agent draws {player_card_value}.")
-                # Check whether it can be an ace.
-                if player_card_value == 11 and player_hand_value \
-                                                + player_card_value > 21:
-                    player_card_value = 1
-                elif player_card_value == 11 and player_hand_value \
-                                                + player_card_value <= 21:
-                    player_has_ace = 1
-
-                player_hand_value += player_card_value
-                # print(f"Agent hand value {player_hand_value}.")
-
-                # Check whether the player busts.
-                if player_hand_value > 21:
-                    # print(f"Agent busts.")
-                    break
-
-                # Continue playing until the player decides to stick.
-                continue
-            
-            # print("\nAgent sticks.")
-            break
-
-        # Play the dealers hand.
-        # The dealer will hit everything below 17.
-        while dealer_hand_value < 17 and player_hand_value <= 21:
-            # Draw a card.
-            dealer_card_value = random.randint(2, 11)
-            # print(f"dealer draws {dealer_card_value}.")
-            # Check whether it can be an ace.
-            if dealer_card_value == 11 and dealer_hand_value \
-                                            + dealer_card_value > 21:
-                dealer_card_value = 1
-
-            dealer_hand_value += dealer_card_value
-            # print(f"Dealer hand value {dealer_hand_value}.")
-
-            # Check whether the dealer busts.
-            if dealer_hand_value > 21:
-                # print("Dealer busts.")
-                break
-
-        # Determine the winner of the game.
-        # Check if the dealer has won.
-        if dealer_hand_value <= 21 and dealer_hand_value > player_hand_value \
-            or player_hand_value > 21:
-            # print("Dealer wins.")
-            episode[-1]['reward'] = -1
-        # Check if the game is a draw.
-        elif dealer_hand_value == player_hand_value:
-            # print("Dealer & Agent draw.")
-            pass
-        # Else the player wins.
-        else:
-            # print("Agent wins.")
-            episode[-1]['reward'] = 1
-
-        # print(f"({player_hand_value}, {dealer_hand_value}, {player_has_ace})")
-        # print(episode)
-        return episode
+        # print("Saving animation...")
+        # animation.save('blackjack_value_function.gif',
+        #                writer='pillow',
+        #                fps=5)
+        # print("Animation saved.")
     
     def check_state_visited_earlier(self, episode: list, index: int) -> bool:
         """Check if the state is visted earlier in the episode."""
@@ -252,10 +156,10 @@ class Blackjack:
         """Update the state value estimation."""
 
         # Update the state value estimation.
-        self.state_space[state]['state returns']['entries'] += 1
-        state_average_value = self.state_space[state]['state value']
-        entries = self.state_space[state]['state returns']['entries']
-        self.state_space[state]['state value'] += (expected_return \
+        self.state_space[state]['state entries'] += 1
+        state_average_value = self.state_space[state]['estimated return']
+        entries = self.state_space[state]['state entries']
+        self.state_space[state]['estimated return'] += (expected_return \
                                                     - state_average_value) \
                                                     / entries
     
@@ -297,7 +201,7 @@ class Blackjack:
               
         maximum_number_of_episodes = 100000
         gamma = 1
-        track_data = False
+        track_data = True
 
         print(f"Computing {maximum_number_of_episodes} episodes "
               f"with gamma {gamma}.")
@@ -305,7 +209,7 @@ class Blackjack:
         # Loop for every episode.
         for episode_counter in range(maximum_number_of_episodes):
             # Play a hand of Blackjack under the policy.
-            episode = self.play_hand()
+            episode = generate_blackjack_episode(self.state_space, 'target')
 
             # Reverse the list.
             # I belive this is where the no bootstrapping thing comes in.
@@ -317,7 +221,7 @@ class Blackjack:
             self.process_episode(episode, gamma, expected_return)
 
             # Add the episode to the list of tracked episodes.
-            if track_data:
+            if track_data and episode_counter >= maximum_number_of_episodes - 1:
                 self.track_data(episode_counter, start_time)
 
             # Print the progress.
@@ -326,13 +230,6 @@ class Blackjack:
 
         # This is here for errors. It was hard to read them without a new line.
         print("\rCompleted 1.0           \n")
-
-
-    def off_policy_prediction_via_importance_sampling(self,
-                                                      state: tuple[int, int, int]):
-        """Estimate the value of a single state with off-policy data"""
-
-
 
 if __name__ == "__main__":
     beat_the_dealer = Blackjack()
