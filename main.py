@@ -36,13 +36,10 @@ class Blackjack:
 
                     # State values.
                     self.state_space[state] = {
-                        'state actions': {},
-                        'policies': {},
-                        'state reward': 0,
-                        'state value': 0,
-                        'state returns': {
-                            'entries': 0,
-                        },
+                        'state actions': {}, # State actions.
+                        'policies': {}, # State policies.
+                        'estimated return': 0, # Expected return for a state.
+                        'state entries': 0, # Number of times a state is encountered.
                     }
 
                     # State actions.
@@ -110,7 +107,7 @@ class Blackjack:
                 for j, dealer_value in enumerate(self.dealer_values):
                     # Usable ace.
                     state = (player_value, dealer_value, 1)
-                    z_data[i, j] = self.data[frame][state]['state value']
+                    z_data[i, j] = self.data[frame][state]['estimated return']
                     ax.set_title(f'Value Function after {frame} episodes')
 
             if frame == len(self.data) - 1:
@@ -118,7 +115,7 @@ class Blackjack:
                     for j, dealer_value in enumerate(self.dealer_values):
                         # Usable ace.
                         state = (player_value, dealer_value, 1)
-                        z_data[i, j] = self.data[-1][state]['state value']
+                        z_data[i, j] = self.data[-1][state]['estimated return']
                 surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
             else:
                 surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
@@ -258,10 +255,10 @@ class Blackjack:
         """Update the state value estimation."""
 
         # Update the state value estimation.
-        self.state_space[state]['state returns']['entries'] += 1
-        state_average_value = self.state_space[state]['state value']
-        entries = self.state_space[state]['state returns']['entries']
-        self.state_space[state]['state value'] += (expected_return \
+        self.state_space[state]['state entries'] += 1
+        state_average_value = self.state_space[state]['estimated return']
+        entries = self.state_space[state]['state entries']
+        self.state_space[state]['estimated return'] += (expected_return \
                                                     - state_average_value) \
                                                     / entries
     
