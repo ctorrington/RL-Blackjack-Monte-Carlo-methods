@@ -12,6 +12,7 @@ import copy
 import time
 
 from constants import Constants
+from generate_blackjack_episode import generate_blackjack_episode
 
 class Blackjack:
     """Blackjack environment."""
@@ -116,9 +117,9 @@ class Blackjack:
                         # Usable ace.
                         state = (player_value, dealer_value, 1)
                         z_data[i, j] = self.data[-1][state]['estimated return']
-                surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
+                surface = ax.plot_surface(Y, X, z_data, cmap='viridis')
             else:
-                surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
+                surface = ax.plot_surface(Y, X, z_data, cmap='viridis')
                 
     
         frames = self.exponential_frame_sequence(100, len(self.data))
@@ -135,107 +136,6 @@ class Blackjack:
         #                writer='pillow',
         #                fps=5)
         # print("Animation saved.")
-
-    def play_hand(self) -> list:
-        """Generate an episode under the policy.
-        
-        I don't think its possible to refactor this anymore. I am sorry."""
-
-        # Using a dictionary for tracking states, actions & rewards in an episode.
-        # The dictionaries will be indexable within the list for the time stamps.
-        episode = []
-        episode_time = {'state': tuple[int, int, int],
-                        'action': int,
-                        'reward': int}
-
-        player_hand_value = random.randint(12, 21)
-        dealer_hand_value = random.randint(1, 10)
-        if player_hand_value > 11:
-            player_has_ace = 1
-        else:
-            player_has_ace = random.randint(0, 1)
-
-        # Game loop.
-        # Whle the player is not bust.
-        while player_hand_value <= 21:
-            state = (player_hand_value, dealer_hand_value, player_has_ace)
-            episode_time['state'] = state
-            # print(f"Game state {state}.")
-
-            # Get the players next action.
-            # player_action =  self.policy[state]
-            player_action = self.state_space[state]['policies']['target']
-            episode_time['action'] = player_action
-            # print(f"Agent action {player_action}.")
-
-            episode_time['reward'] = 0
-            episode.append(copy.copy(episode_time))
-
-            # Resolve the players decision.
-            if player_action == self.ACTIONS.HIT:
-                # print("\nAgent hits.")
-                # Draw a card.
-                player_card_value = random.randint(2, 11)
-                # print(f"Agent draws {player_card_value}.")
-                # Check whether it can be an ace.
-                if player_card_value == 11 and player_hand_value \
-                                                + player_card_value > 21:
-                    player_card_value = 1
-                elif player_card_value == 11 and player_hand_value \
-                                                + player_card_value <= 21:
-                    player_has_ace = 1
-
-                player_hand_value += player_card_value
-                # print(f"Agent hand value {player_hand_value}.")
-
-                # Check whether the player busts.
-                if player_hand_value > 21:
-                    # print(f"Agent busts.")
-                    break
-
-                # Continue playing until the player decides to stick.
-                continue
-            
-            # print("\nAgent sticks.")
-            break
-
-        # Play the dealers hand.
-        # The dealer will hit everything below 17.
-        while dealer_hand_value < 17 and player_hand_value <= 21:
-            # Draw a card.
-            dealer_card_value = random.randint(2, 11)
-            # print(f"dealer draws {dealer_card_value}.")
-            # Check whether it can be an ace.
-            if dealer_card_value == 11 and dealer_hand_value \
-                                            + dealer_card_value > 21:
-                dealer_card_value = 1
-
-            dealer_hand_value += dealer_card_value
-            # print(f"Dealer hand value {dealer_hand_value}.")
-
-            # Check whether the dealer busts.
-            if dealer_hand_value > 21:
-                # print("Dealer busts.")
-                break
-
-        # Determine the winner of the game.
-        # Check if the dealer has won.
-        if dealer_hand_value <= 21 and dealer_hand_value > player_hand_value \
-            or player_hand_value > 21:
-            # print("Dealer wins.")
-            episode[-1]['reward'] = -1
-        # Check if the game is a draw.
-        elif dealer_hand_value == player_hand_value:
-            # print("Dealer & Agent draw.")
-            pass
-        # Else the player wins.
-        else:
-            # print("Agent wins.")
-            episode[-1]['reward'] = 1
-
-        # print(f"({player_hand_value}, {dealer_hand_value}, {player_has_ace})")
-        # print(episode)
-        return episode
     
     def check_state_visited_earlier(self, episode: list, index: int) -> bool:
         """Check if the state is visted earlier in the episode."""
@@ -298,7 +198,7 @@ class Blackjack:
         print("Estimating the value function under the policy with First-visit"
               " Monte Carlo Prediction.")
               
-        maximum_number_of_episodes = 100000
+        maximum_number_of_episodes = 1000000
         gamma = 1
         track_data = True
 
@@ -308,7 +208,7 @@ class Blackjack:
         # Loop for every episode.
         for episode_counter in range(maximum_number_of_episodes):
             # Play a hand of Blackjack under the policy.
-            episode = self.play_hand()
+            episode = generate_blackjack_episode(self.state_space)
 
             # Reverse the list.
             # I belive this is where the no bootstrapping thing comes in.
