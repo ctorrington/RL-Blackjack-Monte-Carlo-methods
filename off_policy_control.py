@@ -2,14 +2,14 @@
 
 # Dependencies
 import numpy as np
-from generate_blackjack_episode import generate_blackjack_episode
+from blackjack import generate_blackjack_episode
 
 from constants import Constants
 
 ACTIONS = Constants.ACTIONS
 
 
-def off_policy_control(state_space, data):
+def estimate_optimal_policy(state_space):
     """Off-policy Monte Carlo Control Method for estimating optimal policy"""
 
     maximum_number_of_episodes = 100000

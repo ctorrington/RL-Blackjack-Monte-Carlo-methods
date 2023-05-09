@@ -12,8 +12,8 @@ import copy
 import time
 
 from constants import Constants
-from generate_blackjack_episode import generate_blackjack_episode
-from off_policy_control import off_policy_control
+from blackjack import generate_blackjack_episode
+from off_policy_control import estimate_optimal_policy
 
 class Blackjack:
     """Blackjack environment."""
@@ -68,7 +68,7 @@ class Blackjack:
                     }
         self.data = []
 
-        off_policy_control(self.state_space, self.data)
+        estimate_optimal_policy(self.state_space)
         self.estimate_value_function()
         self.animate_state_space()
 
@@ -209,7 +209,7 @@ class Blackjack:
         # Loop for every episode.
         for episode_counter in range(maximum_number_of_episodes):
             # Play a hand of Blackjack under the policy.
-            episode = generate_blackjack_episode(self.state_space, 'behaviour')
+            episode = generate_blackjack_episode(self.state_space, 'target')
 
             # Reverse the list.
             # I belive this is where the no bootstrapping thing comes in.
