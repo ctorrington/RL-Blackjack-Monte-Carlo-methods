@@ -67,8 +67,11 @@ def simulate_player_turn(state,
         # Record the state in the timestep.
         timestep['state'] = state
 
-        # Get the players action for the current state.
-        action = state_space[state]['policies'][policy]
+        # Get the players action for the current state determined by the policy.
+        if policy == 'behaviour':
+            action = random.choice(ACTIONS.as_tuple())
+        elif policy == 'target':
+            action = state_space[state]['policies'][policy]
         # print(f"chosen action {action} in state {state}.")
         # Record the action in the timestep.
         timestep['action'] = action

@@ -10,6 +10,7 @@ from matplotlib.animation import FuncAnimation
 import random
 import copy
 import time
+import math
 
 from constants import Constants
 from blackjack import generate_blackjack_episode
@@ -51,7 +52,7 @@ class Blackjack:
                             # Add the action value and the cumulative weight
                             # for the action in the state.
                             'action value': 0, # Abitrary value.
-                            'cumulative weights': 0, # Initialised as 0.
+                            'cumulative weight': 0, # Initialised as 0.
                         }
 
                     # State policy.
@@ -64,11 +65,10 @@ class Blackjack:
                     # Set the behaviour policy.
                     self.state_space[state]['policies'] = {
                         'target': deterministic_action,
-                        'behaviour': random.choice(self.ACTIONS.as_tuple()),
+                        'behaviour': random.choice(self.ACTIONS.as_tuple()), # This is randomised later as well.
                     }
         self.data = []
-
-        estimate_optimal_policy(self.state_space)
+        self.policy_estimation_data = estimate_optimal_policy(self.state_space)
         self.estimate_value_function()
         self.animate_state_space()
 
@@ -76,7 +76,7 @@ class Blackjack:
                                    number_of_values):
         """Create a sequence of frames for the animation."""
 
-        frame_indices = np.linspace(0, number_of_frames - 1, num=number_of_frames) ** 5
+        frame_indices = np.linspace(0, number_of_frames - 1, num=number_of_frames) ** 2
         frame_indices = frame_indices.astype(int)
         frame_indices = np.clip(frame_indices, 0, number_of_values - 1)
         return frame_indices
@@ -104,39 +104,31 @@ class Blackjack:
         def update_plot(frame):
             """Update the plot."""
 
-            print(frame)
+            print(f"rendering frame {frame}")
+            
             for i, player_value in enumerate(self.player_values):
                 for j, dealer_value in enumerate(self.dealer_values):
                     # Usable ace.
                     state = (player_value, dealer_value, 1)
                     z_data[i, j] = self.data[frame][state]['estimated return']
-                    ax.set_title(f'Value Function after {frame} episodes')
-
-            if frame == len(self.data) - 1:
-                for i, player_value in enumerate(self.player_values):
-                    for j, dealer_value in enumerate(self.dealer_values):
-                        # Usable ace.
-                        state = (player_value, dealer_value, 1)
-                        z_data[i, j] = self.data[-1][state]['estimated return']
-                surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
-            else:
-                surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
+                    ax.set_title(f'Estimated Return after {frame} episodes')
+            surface = ax.plot_surface(X, Y, z_data, cmap='viridis')
                 
-    
         frames = self.exponential_frame_sequence(100, len(self.data))
         animation = FuncAnimation(fig, update_plot,
-                                  frames=len(self.data),
+                                #   frames=len(self.data),
+                                  frames=frames,
                                   interval=1000,
                                   repeat=False)
         print("Completed animation.")
         plt.show()
 
         # Save the animation.
-        # print("Saving animation...")
-        # animation.save('blackjack_value_function.gif',
-        #                writer='pillow',
-        #                fps=5)
-        # print("Animation saved.")
+        print("Saving animation...")
+        animation.save('blackjack_value_function.gif',
+                       writer='pillow',
+                       fps=5)
+        print("Animation saved.")
     
     def check_state_visited_earlier(self, episode: list, index: int) -> bool:
         """Check if the state is visted earlier in the episode."""
@@ -195,21 +187,21 @@ class Blackjack:
     def estimate_value_function(self):
         """Estimate the value function under the policy with First-visit
         Monte Carlo Prediction."""
-
-        print("Estimating the value function under the policy with First-visit"
-              " Monte Carlo Prediction.")
               
         maximum_number_of_episodes = 100000
         gamma = 1
         track_data = True
+        policy = 'target'
 
+        print(f"Estimating the value function under the {policy} policy with First-visit"
+              f" Monte Carlo Prediction.")
         print(f"Computing {maximum_number_of_episodes} episodes "
               f"with gamma {gamma}.")
 
         # Loop for every episode.
         for episode_counter in range(maximum_number_of_episodes):
             # Play a hand of Blackjack under the policy.
-            episode = generate_blackjack_episode(self.state_space, 'target')
+            episode = generate_blackjack_episode(self.state_space, policy)
 
             # Reverse the list.
             # I belive this is where the no bootstrapping thing comes in.
@@ -221,7 +213,7 @@ class Blackjack:
             self.process_episode(episode, gamma, expected_return)
 
             # Add the episode to the list of tracked episodes.
-            if track_data and episode_counter >= maximum_number_of_episodes - 1:
+            if track_data and episode_counter < 1000:
                 self.track_data(episode_counter, start_time)
 
             # Print the progress.
